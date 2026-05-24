@@ -36,6 +36,15 @@ class NotionWorkspaceAgent(BaseAgent):
         pipeline = NotionExtractionPipeline()
         return pipeline.run()
 
+    def get_status_info(self) -> dict:
+        """Returns the status info dict for the menu."""
+        is_ready = self.is_ready()
+        return {
+            "Fuente": "Notion Workspace",
+            "Conocimiento actual": "Disponible (Archivos locales creados)" if is_ready else "No disponible (Requiere extracción)",
+            "Capacidades": "Chat, Refrescar Conocimiento, Escribir Insights Bidireccional"
+        }
+
     def start_chat(self) -> None:
         """Instantiates the mentor agent and starts the CLI loop."""
         result = self.policy.evaluate()

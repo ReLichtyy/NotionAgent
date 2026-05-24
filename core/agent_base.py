@@ -53,3 +53,11 @@ class BaseAgent(ABC):
             ("Usar contexto actual (Entrar al chat)", self.start_chat),
             ("Refrescar conocimiento (Full Crawl)", self.refresh_knowledge)
         ]
+
+    @abstractmethod
+    def get_status_info(self) -> dict:
+        """
+        Returns a dictionary with status information to be displayed in the menu.
+        Example: {"Fuente": "Notion Workspace", "Conocimiento actual": "Disponible"}
+        """
+        pass

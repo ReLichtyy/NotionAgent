@@ -36,6 +36,12 @@ def render_agent_menu(agent):
         print(f" --- {agent.get_name()} ---")
         print("=" * 50)
         
+        status_info = agent.get_status_info()
+        if status_info:
+            for key, value in status_info.items():
+                print(f"  • {key}: {value}")
+            print("-" * 50)
+        
         for i, (opt_name, _) in enumerate(options, 1):
             print(f"{i}. {opt_name}")
             

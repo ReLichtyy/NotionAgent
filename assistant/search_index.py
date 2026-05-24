@@ -10,9 +10,9 @@ from core.config import get_settings
 logger = get_logger("SearchIndex")
 
 class SimpleSearchIndex:
-    def __init__(self):
+    def __init__(self, fragments_file: str = None):
         self.settings = get_settings()
-        self.fragments_file = self.settings.NOTION_JSON_PATH
+        self.fragments_file = fragments_file or self.settings.NOTION_JSON_PATH
         self.fragments: List[Dict[str, Any]] = []
         self._load_fragments()
 
