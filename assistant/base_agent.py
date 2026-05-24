@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from clients.openai_client import OpenAIAppClient
 from assistant.search_index import SimpleSearchIndex
 from core.logger import get_logger
+from core.ui_formatter import UIFormatter
 
 logger = get_logger("BaseAgent")
 
