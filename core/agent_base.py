@@ -61,3 +61,11 @@ class BaseAgent(ABC):
         Example: {"Fuente": "Notion Workspace", "Conocimiento actual": "Disponible"}
         """
         pass
+
+    @abstractmethod
+    def get_theme_color(self) -> str:
+        """
+        Returns the primary color theme for this agent used in the UI.
+        Examples: 'cyan', 'green', 'magenta'.
+        """
+        pass

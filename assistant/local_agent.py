@@ -4,8 +4,8 @@ from core.logger import get_logger
 logger = get_logger("LocalAgent")
 
 class LocalMentorAgent(BaseMentorAgent):
-    def __init__(self):
-        super().__init__(fragments_file="local_workspace_fragments.json")
+    def __init__(self, fragments_file: str = "local_workspace_fragments.json"):
+        super().__init__(fragments_file=fragments_file, theme_color="green")
         self.tools = [] # No tools for read-only MVP
         
     def _get_system_prompt(self) -> str:

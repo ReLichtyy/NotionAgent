@@ -8,6 +8,7 @@ from parser.notion_parser import NotionParser
 from generator.markdown_generator import MarkdownGenerator
 from generator.json_generator import JsonFragmentGenerator
 from assistant.agent import NotionMentorAgent
+from core.ui_formatter import UIFormatter
 
 logger = get_logger("Main")
 
@@ -32,15 +33,9 @@ def render_agent_menu(agent):
     while True:
         options = agent.get_menu_options()
         
-        print("\n" + "=" * 50)
-        print(f" --- {agent.get_name()} ---")
-        print("=" * 50)
-        
         status_info = agent.get_status_info()
-        if status_info:
-            for key, value in status_info.items():
-                print(f"  • {key}: {value}")
-            print("-" * 50)
+        theme_color = agent.get_theme_color()
+        UIFormatter.print_menu_header(agent.get_name(), status_info, theme_color)
         
         for i, (opt_name, _) in enumerate(options, 1):
             print(f"{i}. {opt_name}")
@@ -70,9 +65,7 @@ def render_agent_menu(agent):
             print("Opción fuera de rango.")
 
 def main():
-    print("=" * 50)
-    print("🚀 INICIANDO LAB SYNC: LAUNCHER MULTI-AGENTE")
-    print("=" * 50)
+    UIFormatter.print_banner()
     
     # Initialize Registry and Register Agents
     registry = AgentRegistry()

@@ -65,6 +65,9 @@ class LocalFileManagerAgent(BaseAgent):
         }
         return info
 
+    def get_theme_color(self) -> str:
+        return "green"
+
     def view_current_selection(self) -> None:
         print("\n" + "=" * 40)
         print(" SELECCIÓN ACTUAL (MANIFEST)")

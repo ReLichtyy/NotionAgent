@@ -11,7 +11,7 @@ RESET = '\033[0m'
 
 class NotionMentorAgent(BaseMentorAgent):
     def __init__(self):
-        super().__init__()
+        super().__init__(theme_color="cyan")
         self.notion_client = NotionAppClient()
         
         self.tools = [
@@ -86,10 +86,17 @@ REGLAS CRÍTICAS DE GROUNDING Y RECUPERACIÓN (RAG):
             if not page_id:
                 return f"Error: No encontré la página '{page_title_or_id}'."
             else:
+                from core.spinner import RainbowSpinner
+                
+                with RainbowSpinner("Estructurando nota..."):
+                    from generator.note_policy import NoteFormattingPolicy
+                    formatter = NoteFormattingPolicy(self.openai_client)
+                    structured_content = formatter.process(insight_content)
+                
                 print(f"{CYAN}[TOOL] Escribiendo '{insight_title}' en Notion...{RESET}")
-                success, error_msg = self.notion_client.append_toggle_to_page(page_id, insight_title, insight_content)
+                success, error_msg = self.notion_client.append_toggle_to_page(page_id, insight_title, structured_content)
                 if success:
-                    return f"Éxito: Se añadió correctamente el contenido a la página '{page_title_or_id}'."
+                    return f"Éxito: Se añadió correctamente el contenido a la página '{page_title_or_id}' con formato estructurado."
                 else:
                     fallback_prompt = (
                         f"Error: {error_msg}. \n"

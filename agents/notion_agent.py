@@ -45,6 +45,9 @@ class NotionWorkspaceAgent(BaseAgent):
             "Capacidades": "Chat, Refrescar Conocimiento, Escribir Insights Bidireccional"
         }
 
+    def get_theme_color(self) -> str:
+        return "cyan"
+
     def start_chat(self) -> None:
         """Instantiates the mentor agent and starts the CLI loop."""
         result = self.policy.evaluate()

@@ -17,11 +17,12 @@ class BaseMentorAgent(ABC):
     """
     Abstract base class for interactive mentor agents using the OpenAI client and a SimpleSearchIndex.
     """
-    def __init__(self, fragments_file: str = "workspace_fragments.json"):
+    def __init__(self, fragments_file: str = "workspace_fragments.json", theme_color: str = "white"):
         self.openai_client = OpenAIAppClient()
         self.conversation_history: List[Dict[str, str]] = []
         self.search_index = SimpleSearchIndex(fragments_file=fragments_file)
         self.tools = [] # Subclasses should populate this if needed
+        self.theme_color = theme_color
 
     @abstractmethod
     def _get_system_prompt(self) -> str:
@@ -66,7 +67,7 @@ class BaseMentorAgent(ABC):
                 top_fragments = self.search_index.search(user_input, top_k=4)
                 context_str = ""
                 if top_fragments:
-                    print(f"{CYAN}[DEBUG] Se encontraron {len(top_fragments)} fragmentos relevantes.{RESET}")
+                    # Se eliminó el log de debug aquí para limpiar la consola
                     for idx, frag in enumerate(top_fragments):
                         context_str += f"\n--- Fragmento {idx+1} ---\nTítulo: {frag.get('title')}\nRuta: {frag.get('path')}\nContenido:\n{frag.get('text')}\n"
                 
@@ -74,9 +75,10 @@ class BaseMentorAgent(ABC):
                 dynamic_user_prompt = f"[CONTEXTO RECUPERADO]\n{context_str}\n\n[CONSULTA DEL USUARIO]\n{user_input}"
                 self.conversation_history.append({"role": "user", "content": dynamic_user_prompt})
                 
-                print("🤖 Lab Sync (Pensando...)", end="\r")
-                message = self.openai_client.chat(self.conversation_history, tools=self.tools if self.tools else None)
-                print(" " * 30 + "\r", end="") 
+                from core.spinner import RainbowSpinner
+                
+                with RainbowSpinner("Lab Sync pensando..."):
+                    message = self.openai_client.chat(self.conversation_history, tools=self.tools if self.tools else None)
                 
                 if not message:
                     print("🤖 Lab Sync: Error al comunicarse con la IA.")
@@ -99,11 +101,13 @@ class BaseMentorAgent(ABC):
                         })
                     
                     # Llamar nuevamente al modelo para que genere la respuesta final al usuario
-                    print("🤖 Lab Sync (Confirmando...)", end="\r")
-                    final_message = self.openai_client.chat(self.conversation_history)
-                    print(" " * 30 + "\r", end="") 
+                    with RainbowSpinner("Lab Sync escribiendo insight..."):
+                        final_message = self.openai_client.chat(self.conversation_history)
+                        
                     final_text = final_message.content if final_message else "Hecho."
-                    print(f"🤖 Lab Sync: {final_text}")
+                    
+                    UIFormatter.print_agent_avatar(self.theme_color)
+                    UIFormatter.print_typewriter_markdown(final_text)
                     
                     # Restauramos el query original en vez del bloque de RAG masivo
                     self.conversation_history = [m for m in self.conversation_history if m.get("role") != "user" or m.get("content") != dynamic_user_prompt]
@@ -112,7 +116,9 @@ class BaseMentorAgent(ABC):
                     
                 else:
                     text_response = message.content or "No entendí."
-                    print(f"🤖 Lab Sync: {text_response}")
+                    
+                    UIFormatter.print_agent_avatar(self.theme_color)
+                    UIFormatter.print_typewriter_markdown(text_response)
                     
                     # Restauramos el query original
                     self.conversation_history[-1] = {"role": "user", "content": user_input}
