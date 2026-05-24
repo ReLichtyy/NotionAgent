@@ -106,9 +106,10 @@ class NotionAppClient:
             logger.error(f"Failed to retrieve page {page_id}: {e}")
             return {}
 
-    def append_toggle_to_page(self, page_id: str, title: str, text_content: str) -> bool:
+    def append_toggle_to_page(self, page_id: str, title: str, text_content: str) -> tuple[bool, str]:
         """
         Appends a toggle block to the given page ID.
+        Returns a tuple (success: bool, error_message: str).
         """
         try:
             # We can split text_content by newlines into multiple paragraphs if needed,
@@ -140,7 +141,23 @@ class NotionAppClient:
                 ]
             )
             logger.info(f"Successfully appended toggle '{title}' to page {page_id}")
-            return True
+            return True, "Éxito"
+            
+        except APIResponseError as e:
+            if e.code == "restricted_resource":
+                msg = ("Error 'RestrictedResource': La integración tiene las capabilities globales correctas, "
+                       "pero falló al escribir. Causa probable: (1) La página/bloque específico es de solo lectura para esta integración, "
+                       "o (2) El endpoint 'append' tiene restricciones estructurales sobre el recurso destino.")
+            elif e.code == "object_not_found":
+                msg = ("Error 'ObjectNotFound': El page_id/block_id usado es incorrecto, "
+                       "o la página no ha sido compartida con la Integración.")
+            else:
+                msg = f"Error nativo de Notion API: {e.code} - {e.message}"
+                
+            logger.error(msg)
+            return False, msg
+            
         except Exception as e:
-            logger.error(f"Failed to append toggle to page {page_id}: {e}")
-            return False
+            msg = f"Error inesperado al comunicarse con Notion: {e}"
+            logger.error(msg)
+            return False, msg

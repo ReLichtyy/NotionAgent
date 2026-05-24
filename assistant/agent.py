@@ -87,10 +87,17 @@ REGLAS CRÍTICAS DE GROUNDING Y RECUPERACIÓN (RAG):
                 return f"Error: No encontré la página '{page_title_or_id}'."
             else:
                 print(f"{CYAN}[TOOL] Escribiendo '{insight_title}' en Notion...{RESET}")
-                success = self.notion_client.append_toggle_to_page(page_id, insight_title, insight_content)
+                success, error_msg = self.notion_client.append_toggle_to_page(page_id, insight_title, insight_content)
                 if success:
                     return f"Éxito: Se añadió correctamente el contenido a la página '{page_title_or_id}'."
                 else:
-                    return f"Error: Falló la API de Notion al escribir."
+                    fallback_prompt = (
+                        f"Error: {error_msg}. \n"
+                        f"[INSTRUCCIÓN CRÍTICA PARA EL AGENTE LLM] "
+                        f"Dile al usuario que no pudiste escribir en Notion por problemas de permisos y entrégale "
+                        f"el siguiente contenido en un bloque de código Markdown para que pueda copiarlo y pegarlo manualmente:\n\n"
+                        f"# {insight_title}\n{insight_content}"
+                    )
+                    return fallback_prompt
                     
         return super().handle_tool_call(tool_call)
