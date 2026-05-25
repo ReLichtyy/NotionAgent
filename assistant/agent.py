@@ -78,6 +78,7 @@ REGLAS CRÍTICAS DE GROUNDING Y RECUPERACIÓN (RAG):
 1. En cada mensaje se inyectará un bloque "[CONTEXTO RECUPERADO]". Úsalo para responder.
 2. Si el usuario pide que guardes, añadas o escribas algo en Notion, DEBES usar la herramienta `append_to_notion` sin intentar adivinar los IDs precisos (escribe el nombre que el usuario te pidió, el sistema lo resolverá internamente).
 3. No le expliques al usuario los JSONs internos ni las herramientas, mantén la respuesta limpia.
+4. REGLA DE GROUNDING ESTRICTO: Si el usuario te pide navegar a una página, leerla o listar su contenido, y el bloque [CONTEXTO RECUPERADO] está vacío o no contiene la información pedida, TIENES ESTRICTAMENTE PROHIBIDO inventar o sugerir contenido genérico. En su lugar, debes admitir explícitamente que no encontraste la información y ofrecer una lista de páginas candidatas cercanas o pedir confirmación de la ruta exacta.
 """
 
     def handle_tool_call(self, tool_call) -> str:

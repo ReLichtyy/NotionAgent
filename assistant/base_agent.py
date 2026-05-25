@@ -133,6 +133,44 @@ class BaseMentorAgent(ABC):
                                 live_context = f"\n=== [ÁRBOL DE CONTENIDO PROFUNDO: {t_name}] ===\n{tree_text}\n====================\n"
                             else:
                                 logger.warning(f"Tree requested for {t_name} but no descendants found.")
+                        elif source_state.get("intent") == "navigate_path" and source_state.get("target_page_or_path"):
+                            # Fix 3.1: Path & Breadcrumb Resolver
+                            t_path = source_state.get("target_page_or_path").replace(" > ", " / ")
+                            
+                            def path_matches(frag_path, search_path):
+                                return search_path.lower() in frag_path.lower()
+                                
+                            matches = [f for f in self.search_index.fragments if path_matches(f.get("path", ""), t_path) or f.get("title", "").lower() == t_path.lower()]
+                            
+                            if matches:
+                                best_match = matches[0]
+                                live_context = f"\n=== [NAVEGACIÓN EXITOSA: {best_match.get('title')}] ===\nRuta exacta: {best_match.get('path')}\nContenido:\n{best_match.get('text', '')[:2000]}\n====================\n"
+                                # Force bypass of semantic search for strict navigation
+                                source_state["bypass_semantic"] = True
+                            else:
+                                logger.warning(f"Navigate requested for {t_path} but no path matched.")
+                                
+                        elif source_state.get("intent") == "list_children" and source_state.get("target_name"):
+                            # Fix 3.2: Agregación de Sub-Árbol (list_children level 1)
+                            t_name = source_state.get("target_name")
+                            
+                            def is_direct_child(path_str, parent_name):
+                                if path_str.endswith(f" / {parent_name}"): return False
+                                if f"{parent_name} / " in path_str:
+                                    # check if it's exactly 1 level deep
+                                    remainder = path_str.split(f"{parent_name} / ")[1]
+                                    return " / " not in remainder
+                                return False
+
+                            children = [f for f in self.search_index.fragments if is_direct_child(f.get("path", ""), t_name)]
+                            
+                            if children:
+                                children_list = "\n".join([f"- {c.get('title')} (Ruta: {c.get('path')})" for c in children])
+                                live_context = f"\n=== [CONTENIDO DENTRO DE: {t_name}] ===\n{children_list}\n====================\n"
+                                source_state["bypass_semantic"] = True
+                            else:
+                                logger.warning(f"Children requested for {t_name} but none found.")
+                                
                     metrics.end_phase("Intent Resolver")
 
                 # Build context based on source
@@ -145,9 +183,9 @@ class BaseMentorAgent(ABC):
                 notion_frags = []
                 local_frags = []
                 
-                if source in ["notion", "hybrid"]:
+                if source in ["notion", "hybrid"] and not source_state.get("bypass_semantic"):
                     notion_frags = self.search_index.search(user_input, top_k=3)
-                if source in ["local_files", "hybrid"]:
+                if source in ["local_files", "hybrid"] and not source_state.get("bypass_semantic"):
                     local_frags = self.local_search_index.search(user_input, top_k=3)
                     
                 if notion_frags:

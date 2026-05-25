@@ -141,8 +141,10 @@ FUENTES POSIBLES (source):
 - 'hybrid': Si pide cruzar ambas cosas (ej. "analiza este proyecto y conéctalo con mi nota de Arquitectura").
 
 INTENCIÓN (intent):
+- 'navigate_path': Si pide navegar o encontrar una página exacta usando una ruta (ej. "ve a la página IA dentro de Lab").
+- 'list_children': Si pide ver qué más hay o listar el contenido de una carpeta/página (ej. "qué más hay en All Time").
 - 'read_page': Quiere extraer explícitamente el contenido puntual de UNA nota del workspace.
-- 'read_page_tree': Quiere extraer TODO lo que hay DENTRO, un resumen completo, o la descendencia (subpáginas, semanas, módulos) de una página principal.
+- 'read_page_tree': Quiere extraer TODO lo que hay DENTRO, un resumen completo, o la descendencia de una página principal.
 - 'analyze_local': Pide explícitamente analizar código o proyecto local.
 - 'open_query': Consulta teórica, pregunta abierta o de chat normal.
 
@@ -153,15 +155,20 @@ Mensaje del usuario:
 
 Debes devolver UNICAMENTE un JSON válido con esta estructura:
 {{
+    "intent": "navigate_path" | "list_children" | "read_page" | "read_page_tree" | "analyze_local" | "open_query",
     "source": "notion" | "local_files" | "hybrid",
-    "intent": "read_page" | "read_page_tree" | "analyze_local" | "open_query",
-    "target_name": "Nombre de la página o ruta del proyecto (vacío si es open_query)"
+    "target_page_or_path": "Nombre de la página o ruta (ej. 'Lab > IA > RAG', vacío si es open_query)",
+    "operation_type": "EXACT_MATCH" | "FUZZY_SEARCH" | "READ_CONTENT",
+    "confidence": 0.95
 }}
 """
         result = {
+            "intent": "open_query",
             "source": "notion", 
-            "intent": "open_query", 
             "target_name": "", 
+            "target_page_or_path": "",
+            "operation_type": "READ_CONTENT",
+            "confidence": 1.0,
             "resolved_target_id": None
         }
         
@@ -174,11 +181,21 @@ Debes devolver UNICAMENTE un JSON válido con esta estructura:
                 
                 result["source"] = llm_state.get("source", "notion")
                 result["intent"] = llm_state.get("intent", "open_query")
-                target_raw = llm_state.get("target_name", "")
-                result["target_name"] = target_raw
+                target_raw = llm_state.get("target_page_or_path", "")
+                result["target_page_or_path"] = target_raw
+                # For backwards compatibility and fuzzy matching:
+                result["target_name"] = target_raw.split(" > ")[-1].strip() if " > " in target_raw else target_raw
                 
-                if result["intent"] in ["read_page", "read_page_tree"] and target_raw and result["source"] in ["notion", "hybrid"]:
-                    match_info = self._fuzzy_match_page(target_raw, notion_fragments)
+                result["operation_type"] = llm_state.get("operation_type", "READ_CONTENT")
+                result["confidence"] = llm_state.get("confidence", 1.0)
+                
+                # If confidence is low, fall back to open_query
+                if result["confidence"] < 0.70 and result["intent"] != "open_query":
+                    logger.warning(f"Low confidence ({result['confidence']}) for intent {result['intent']}. Falling back to open_query.")
+                    result["intent"] = "open_query"
+                
+                if result["intent"] in ["read_page", "read_page_tree", "navigate_path", "list_children"] and result["target_name"] and result["source"] in ["notion", "hybrid"]:
+                    match_info = self._fuzzy_match_page(result["target_name"], notion_fragments)
                     if match_info["status"] in ["exact", "fuzzy"]:
                         result["resolved_target_id"] = match_info["id"]
                         result["target_name"] = match_info["title"]

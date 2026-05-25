@@ -18,11 +18,7 @@ def get_logger(name: str) -> logging.Logger:
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
         
-        # Stream handler for WARNING/ERROR only so UI is clean
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.WARNING)
-        console_formatter = logging.Formatter('[%(levelname)s] %(name)s: %(message)s')
-        console_handler.setFormatter(console_formatter)
-        logger.addHandler(console_handler)
+        # Stream handler is removed to keep UI clean. 
+        # All logs (INFO, WARNING, ERROR) will go strictly to app_debug.log.
         
     return logger

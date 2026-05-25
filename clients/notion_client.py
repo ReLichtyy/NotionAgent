@@ -81,11 +81,23 @@ class NotionAppClient:
         
         while has_more:
             try:
-                kwargs = {"database_id": database_id}
+                # Fix for notion-client v3.0.0+ (API version 2025-09-03)
+                # where databases.query was moved to data_sources.query
+                kwargs = {}
                 if next_cursor:
                     kwargs["start_cursor"] = next_cursor
                     
-                response = self.client.databases.query(**kwargs)
+                if hasattr(self.client, "data_sources") and hasattr(self.client.data_sources, "query"):
+                    response = self.client.data_sources.query(data_source_id=database_id, **kwargs)
+                elif hasattr(self.client.databases, "query"):
+                    response = self.client.databases.query(database_id=database_id, **kwargs)
+                else:
+                    response = self.client.request(
+                        path=f"data_sources/{database_id}/query",
+                        method="POST",
+                        body=kwargs
+                    )
+                    
                 pages.extend(response.get("results", []))
                 
                 has_more = response.get("has_more", False)
@@ -108,13 +120,25 @@ class NotionAppClient:
 
     def append_toggle_to_page(self, page_id: str, title: str, text_content: str) -> tuple[bool, str]:
         """
-        Appends a toggle block to the given page ID.
+        Appends a toggle block to the given page ID safely.
+        Validates overlap: if a block with a similar title exists, it appends a timestamp to the new title.
         Returns a tuple (success: bool, error_message: str).
         """
         try:
-            # We can split text_content by newlines into multiple paragraphs if needed,
-            # but for simplicity, we add it as one large text chunk in a paragraph, 
-            # limited to 2000 chars per text object by Notion API.
+            # Fix 4.1: Safe Append / Overlap Validation
+            existing_blocks = self.get_page_blocks(page_id)
+            for block in existing_blocks:
+                b_type = block.get("type")
+                if b_type == "toggle":
+                    rich_text = block.get("toggle", {}).get("rich_text", [])
+                    existing_title = "".join([rt.get("plain_text", "") for rt in rich_text]).strip()
+                    if existing_title.lower() == title.lower():
+                        import datetime
+                        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                        title = f"{title} ({timestamp})"
+                        logger.info(f"Overlap detected. Modifying title to '{title}'")
+                        break
+
             # Notion restricts rich_text content to 2000 chars. We must chunk it.
             chunks = [text_content[i:i+2000] for i in range(0, len(text_content), 2000)]
             rich_text_array = [{"type": "text", "text": {"content": chunk}} for chunk in chunks]
