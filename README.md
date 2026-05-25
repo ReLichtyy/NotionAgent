@@ -25,6 +25,22 @@ El sistema abandonó los agentes monolíticos en favor de una arquitectura orque
 - **Knowledge Expansion Policy:** Si el contenido a agregar ya existe semánticamente en la página destino (Workspace-Grounded Retrieval en vivo), el sistema **jamás** repetirá el contenido. Tiene prohibición algorítmica de redacción pasiva, obligando al modelo a crear Follow-ups condicionales o profundizar el "por qué".
 - **Context Safeguard:** Los volcados masivos en vivo de Notion están truncados dinámicamente a un umbral seguro para proteger el límite de contexto (`context window`) del LLM y evitar gasto innecesario de tokens.
 
+## 🤖 Agentes Disponibles
+
+1. **Notion Workspace Agent**: 
+   - Lee, analiza y escribe en tu espacio de trabajo de Notion.
+   - Bucle de chat bidireccional con herramientas dinámicas.
+
+2. **Local File Manager Agent**: 
+   - Analiza tus carpetas de proyectos de forma segura, filtrando extensiones válidas y evadiendo archivos pesados o binarios.
+   - Genera contexto reutilizable sobre tu código fuente de manera aislada (sin vector DB, guardando indexación en `local_workspace_fragments.json`).
+   - Mantiene la carpeta base guardada en `.local_config.json` para facilitar futuras ejecuciones rápidas.
+
+## 📝 Logging y Telemetría
+
+El orquestador genera un archivo de depuración local llamado `app_debug.log` donde se registra la latencia, crawling profundo, operaciones de la API y trazas del pipeline de generación. 
+**Este archivo se ignora por defecto en `.gitignore`** para evitar subir volcados y ruido innecesario a GitHub.
+
 ## ⚙️ Requisitos y Variables de Entorno (.env)
 
 - **Python:** 3.10+

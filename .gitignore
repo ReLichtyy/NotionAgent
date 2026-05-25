@@ -9,3 +9,7 @@ __pycache__/
 # Local Exports
 workspace_context.md
 workspace_fragments.json  
+
+# Logs
+*.log
+app_debug.log
