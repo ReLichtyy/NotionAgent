@@ -4,7 +4,12 @@ from notion_client import Client
 from notion_client.errors import APIResponseError
 from core.config import get_settings
 from core.exceptions import NotionConnectionError
+import logging
 from core.logger import get_logger
+
+# Silenciar los warnings intrusivos de la librería de notion
+logging.getLogger("notion_client").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.ERROR)
 
 logger = get_logger("NotionClient")
 
