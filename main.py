@@ -65,21 +65,21 @@ def render_agent_menu(agent):
             print("Opción fuera de rango.")
 
 def main():
-    UIFormatter.print_banner()
+    # Solo mostrar Home al inicio
+    UIFormatter.render_home_state()
     
     # Initialize Registry and Register Agents
     registry = AgentRegistry()
     registry.register(NotionWorkspaceAgent())
     registry.register(LocalFileManagerAgent())
     
+    import time
+    time.sleep(1.5)  # Breve pausa para ver el banner principal antes de pasar al picker
+    
     while True:
         agents = registry.get_all_agents()
         
-        print("\n" + "=" * 50)
-        print(" SELECCIÓN DE AGENTE")
-        print("=" * 50)
-        UIFormatter.print_stars_rags()
-        print()
+        UIFormatter.render_agent_picker_state()
         
         for idx, agent in enumerate(agents, 1):
             print(f"{idx}. {agent.get_name()} - {agent.get_description()}")

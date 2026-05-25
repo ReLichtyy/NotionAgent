@@ -1,0 +1,13 @@
+[INFO] 18:51:33 - AgentRegistry: Registered agent: Notion Workspace Agent (notion_workspace)
+[INFO] 18:51:33 - AgentRegistry: Registered agent: Local File Manager Agent (local_file_manager)
+[INFO] 18:51:50 - SearchIndex: Loaded 221 fragments into search index.
+[WARNING] 18:51:50 - SearchIndex: Fragments file local_workspace_fragments.json not found. Search index is empty.
+[INFO] 18:52:03 - SearchIndex: Loaded 221 fragments into search index.
+[WARNING] 18:52:03 - SearchIndex: Fragments file local_workspace_fragments.json not found. Search index is empty.
+[INFO] 18:55:01 - IntentResolver: Resolving source and context intent...
+[INFO] 18:55:02 - IntentResolver: Read Target Resolved: Fundamentos de Base de Datos -> Fundamentos de Base de Datos
+[INFO] 18:55:29 - IntentResolver: Resolving source and context intent...
+[INFO] 18:56:59 - IntentResolver: Resolving source and context intent...
+[INFO] 18:57:00 - IntentResolver: Read Target Resolved: Fundamentos de Base de Datos -> Fundamentos de Base de Datos
+[INFO] 18:58:43 - AgentRegistry: Registered agent: Notion Workspace Agent (notion_workspace)
+[INFO] 18:58:43 - AgentRegistry: Registered agent: Local File Manager Agent (local_file_manager)

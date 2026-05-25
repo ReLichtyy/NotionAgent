@@ -11,35 +11,40 @@ console = Console()
 class UIFormatter:
     @staticmethod
     def print_banner():
-        banner_text = r"""
-  _       _       ____    _____ __  __ _   _  ____ 
- | |     / \     |  _ \  / ____|  \/  | \ | |/ ___|
- | |    / _ \    | |_) | \___ \| \  / |  \| | |    
- | |___/ ___ \   |  _ <   ___) | |\/| | |\  | |___ 
- |____/_/   \_\  |_| \_\ |____/|_|  |_|_| \_|\____|
-        """
-        console.print(Panel(Align.center(Text(banner_text, style="bold cyan")), title="[bold white]🚀 Welcome to[/bold white]", border_style="cyan"))
-        UIFormatter.print_stars_rags()
+        # Alias para retrocompatibilidad, aunque ahora preferimos render_home_state
+        UIFormatter.render_home_state()
 
     @staticmethod
-    def print_stars_rags():
+    def render_home_state():
+        import os
+        os.system('cls' if os.name == 'nt' else 'clear')
+        # "Stars" in bright yellow, "RAGS" in bright red
         stars_rags = r"""
-   _____ _                 _____            _____  _____ 
-  / ____| |               |  __ \     /\   / ____|/ ____|
- | (___ | |_ __ _ _ __ ___| |__) |   /  \ | |  __| (___  
-  \___ \| __/ _` | '__/ __|  _  /   / /\ \| | |_ |\___ \ 
-  ____) | || (_| | |  \__ \ | \ \  / ____ \ |__| |____) |
- |_____/ \__\__,_|_|  |___/_|  \_\/_/    \_\_____|_____/ 
+   [bright_yellow]_____ _                 [/bright_yellow][bright_red]_____            _____  _____[/bright_red]
+  [bright_yellow]/ ____| |               [/bright_yellow][bright_red]|  __ \     /\   / ____|/ ____|[/bright_red]
+ [bright_yellow]| (___ | |_ __ _ _ __ ___[/bright_yellow][bright_red]| |__) |   /  \ | |  __| (___  [/bright_red]
+  [bright_yellow]\___ \| __/ _` | '__/ __[/bright_yellow][bright_red]|  _  /   / /\ \| | |_ |\___ \ [/bright_red]
+  [bright_yellow]____) | || (_| | |  \__ \[/bright_yellow][bright_red]| | \ \  / ____ \ |__| |____) |[/bright_red]
+ [bright_yellow]|_____/ \__\__,_|_|  |___/[/bright_yellow][bright_red]|_|  \_\/_/    \_\_____|_____/ [/bright_red]
         """
-        # Rainbow effect
-        colors = ["red", "yellow", "green", "cyan", "blue", "magenta"]
-        colored_lines = []
-        for i, line in enumerate(stars_rags.split('\n')):
-            color = colors[i % len(colors)]
-            colored_lines.append(f"[bold {color}]{line}[/bold {color}]")
-        
-        rainbow_text = "\n".join(colored_lines)
-        console.print(Align.center(rainbow_text))
+        console.print(Panel(Align.center(Text.from_markup(stars_rags)), title="[bold white]🚀 Welcome to[/bold white]", border_style="bright_blue"))
+        console.print("\n")
+
+    @staticmethod
+    def render_agent_picker_state():
+        import os
+        os.system('cls' if os.name == 'nt' else 'clear')
+        console.print(Align.center("[bold white]Selecciona un agente[/bold white]"))
+        stars_rags = r"""
+   [bright_yellow]_____ _                 [/bright_yellow][bright_red]_____            _____  _____[/bright_red]
+  [bright_yellow]/ ____| |               [/bright_yellow][bright_red]|  __ \     /\   / ____|/ ____|[/bright_red]
+ [bright_yellow]| (___ | |_ __ _ _ __ ___[/bright_yellow][bright_red]| |__) |   /  \ | |  __| (___  [/bright_red]
+  [bright_yellow]\___ \| __/ _` | '__/ __[/bright_yellow][bright_red]|  _  /   / /\ \| | |_ |\___ \ [/bright_red]
+  [bright_yellow]____) | || (_| | |  \__ \[/bright_yellow][bright_red]| | \ \  / ____ \ |__| |____) |[/bright_red]
+ [bright_yellow]|_____/ \__\__,_|_|  |___/[/bright_yellow][bright_red]|_|  \_\/_/    \_\_____|_____/ [/bright_red]
+        """
+        console.print(Align.center(Text.from_markup(stars_rags)))
+        console.print("\n")
 
     @staticmethod
     def print_menu_header(title: str, status_info: dict, theme_color: str):

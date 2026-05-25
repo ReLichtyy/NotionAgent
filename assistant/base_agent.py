@@ -106,6 +106,33 @@ class BaseMentorAgent(ABC):
                             
                             if live_text:
                                 live_context = f"\n=== [CONTENIDO EN VIVO DE LA PÁGINA: {t_name}] ===\n{live_text}\n====================\n"
+                                
+                        elif source_state.get("intent") == "read_page_tree" and source_state.get("target_name"):
+                            t_name = source_state.get("target_name")
+                            
+                            def is_in_branch(path_str, branch_name):
+                                if path_str == branch_name: return True
+                                if path_str.endswith(f" / {branch_name}"): return True
+                                if f" / {branch_name} / " in path_str: return True
+                                if path_str.startswith(f"{branch_name} / "): return True
+                                return False
+
+                            descendants = [f for f in self.search_index.fragments if is_in_branch(f.get("path", ""), t_name)]
+                            
+                            if descendants:
+                                tree_text = ""
+                                for d in descendants:
+                                    frag_text = d.get('text', '')
+                                    if len(frag_text) > 1500:
+                                        frag_text = frag_text[:1500] + "\n[...Truncado (1500 chars limit)]"
+                                    tree_text += f"\n--- {d.get('title')} ({d.get('path')}) ---\n{frag_text}\n"
+                                
+                                if len(tree_text) > 10000:
+                                    tree_text = tree_text[:10000] + "\n\n[... Árbol truncado globalmente por seguridad (10,000 chars).]"
+                                    
+                                live_context = f"\n=== [ÁRBOL DE CONTENIDO PROFUNDO: {t_name}] ===\n{tree_text}\n====================\n"
+                            else:
+                                logger.warning(f"Tree requested for {t_name} but no descendants found.")
                     metrics.end_phase("Intent Resolver")
 
                 # Build context based on source
