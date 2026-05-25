@@ -19,6 +19,27 @@ class UIFormatter:
  |____/_/   \_\  |_| \_\ |____/|_|  |_|_| \_|\____|
         """
         console.print(Panel(Align.center(Text(banner_text, style="bold cyan")), title="[bold white]🚀 Welcome to[/bold white]", border_style="cyan"))
+        UIFormatter.print_stars_rags()
+
+    @staticmethod
+    def print_stars_rags():
+        stars_rags = r"""
+   _____ _                 _____            _____  _____ 
+  / ____| |               |  __ \     /\   / ____|/ ____|
+ | (___ | |_ __ _ _ __ ___| |__) |   /  \ | |  __| (___  
+  \___ \| __/ _` | '__/ __|  _  /   / /\ \| | |_ |\___ \ 
+  ____) | || (_| | |  \__ \ | \ \  / ____ \ |__| |____) |
+ |_____/ \__\__,_|_|  |___/_|  \_\/_/    \_\_____|_____/ 
+        """
+        # Rainbow effect
+        colors = ["red", "yellow", "green", "cyan", "blue", "magenta"]
+        colored_lines = []
+        for i, line in enumerate(stars_rags.split('\n')):
+            color = colors[i % len(colors)]
+            colored_lines.append(f"[bold {color}]{line}[/bold {color}]")
+        
+        rainbow_text = "\n".join(colored_lines)
+        console.print(Align.center(rainbow_text))
 
     @staticmethod
     def print_menu_header(title: str, status_info: dict, theme_color: str):

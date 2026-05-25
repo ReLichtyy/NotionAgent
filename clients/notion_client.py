@@ -161,3 +161,67 @@ class NotionAppClient:
             msg = f"Error inesperado al comunicarse con Notion: {e}"
             logger.error(msg)
             return False, msg
+
+    def create_page(self, parent_page_id: str, title: str) -> tuple[bool, str]:
+        """
+        Creates a new page under a parent page.
+        Returns (True, new_page_id) or (False, error_msg).
+        """
+        try:
+            new_page = self.client.pages.create(
+                parent={"page_id": parent_page_id},
+                properties={
+                    "title": [
+                        {
+                            "text": {
+                                "content": title
+                            }
+                        }
+                    ]
+                }
+            )
+            logger.info(f"Successfully created new page '{title}' with ID {new_page['id']}")
+            return True, new_page["id"]
+        except APIResponseError as e:
+            msg = f"Error nativo de Notion API al crear página: {e.code} - {e.message}"
+            logger.error(msg)
+            return False, msg
+        except Exception as e:
+            msg = f"Error inesperado al crear página: {e}"
+            logger.error(msg)
+            return False, msg
+
+    def read_page_content_as_text(self, page_id: str) -> str:
+        """
+        Fetches the blocks of a page and extracts a plain text representation.
+        This is useful for injecting the LIVE existing content of a page into the LLM context.
+        """
+        try:
+            blocks = self.get_page_blocks(page_id)
+            if not blocks:
+                return ""
+            
+            lines = []
+            for block in blocks:
+                b_type = block.get("type")
+                if not b_type:
+                    continue
+                
+                block_data = block.get(b_type, {})
+                rich_text = block_data.get("rich_text", [])
+                
+                # Extract text
+                text = "".join([rt.get("plain_text", "") for rt in rich_text])
+                
+                if text.strip():
+                    if b_type in ["heading_1", "heading_2", "heading_3"]:
+                        lines.append(f"\n# {text}")
+                    elif b_type == "bulleted_list_item":
+                        lines.append(f"- {text}")
+                    else:
+                        lines.append(text)
+                        
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Failed to read page content as text for {page_id}: {e}")
+            return ""

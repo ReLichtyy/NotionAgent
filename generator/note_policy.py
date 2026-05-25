@@ -7,57 +7,74 @@ class NoteFormattingPolicy:
     def __init__(self, openai_client: OpenAIAppClient):
         self.openai_client = openai_client
         
-    def process(self, raw_content: str) -> str:
+    def process(self, raw_content: str, existing_page_content: str = "") -> str:
         """
         Classifies the raw content and formats it according to strict mental models.
         Returns the cleanly formatted Markdown string.
         """
-        system_prompt = """
-Eres un formateador estricto de notas PKM (Personal Knowledge Management).
-Tu único objetivo es tomar un borrador o insight y reescribirlo bajo uno de los marcos de trabajo estructurales definidos abajo.
+        expansion_instructions = ""
+        if existing_page_content:
+            expansion_instructions = f"""
+=== KNOWLEDGE EXPANSION POLICY (CRÍTICO) ===
+Estás añadiendo contenido a una página que YA EXISTE. Este es su contenido actual:
+---
+{existing_page_content}
+---
+REGLA ANTI-REDUNDANCIA: 
+- Está PROHIBIDO repetir ideas que ya estén en la nota (ej. si la nota ya dice que hay que tener disciplina, no hagas un nuevo bloque diciendo "hay que ser disciplinado").
+- No reempaques lo mismo con otras palabras.
+- Aporta VALOR INCREMENTAL usando una de estas estrategias de expansión:
+  1. Expandir: Profundizar el "por qué" o implicaciones ocultas.
+  2. Follow-up: Seguir la reflexión al siguiente nivel.
+  3. Contraste: Introducir trade-offs o renuncias necesarias.
+  4. Crear rama: Abrir un ángulo inexplorado.
+Tu salida final debe sentirse como un "siguiente paso lógico y profundo" en la reflexión de esta página.
+"""
+
+        system_prompt = f"""
+Eres un escritor experto que guarda notas en el sistema PKM (Personal Knowledge Management) del usuario.
+Tu objetivo es tomar los borradores o ideas del usuario y reescribirlos para que se lean de forma natural, viva, útil y sumamente agradable visualmente.
+
+{expansion_instructions}
+
 REGLAS CRÍTICAS:
-- NUNCA escribas introducciones (ej. "Aquí tienes la nota", "Claro, te lo estructuro").
-- NUNCA escribas conclusiones. 
+- NUNCA uses introducciones como "Aquí tienes la nota" o conclusiones robóticas.
+- NUNCA abuses de las negritas (**). Úsalas raramente y solo para destacar palabras súper clave.
+- NUNCA uses plantillas rígidas que parezcan generadas por una máquina.
 - Devuelve EXCLUSIVAMENTE el texto estructurado en Markdown puro.
+- Mantén párrafos muy cortos y mucho espacio en blanco (respiración visual).
 
-PASOS:
-1. Analiza el texto para detectar su naturaleza (proceso, dato estadístico, concepto, o idea expansiva).
-2. Elige el MODO que mejor se adapte. Si dudas, usa "dreaming".
-3. Formatea el texto respetando exactamente las etiquetas en negrita del modo elegido.
+=== FOLLOW-UP CONDICIONAL ===
+- NO agregues follow-ups si no son estrictamente necesarios.
+- SI, y solo si, la nota resultante abre una duda crítica, sugiere un experimento muy útil, o el usuario lo pide explícitamente, entonces añade una sección final:
+🎯 Siguiente Pregunta / Follow-up
+(Una breve pregunta poderosa o siguiente paso estratégico).
 
-=== MODOS DE FORMATO ===
+=== ESTILO BASE (READABLE NATURAL) ===
+Escribe la nota adaptando el siguiente flujo orgánico. NO pongas todas las secciones si no aplican, usa solo lo que aporte valor.
 
-MODO 1: progressive_breakdown (Para conceptos, definiciones o resúmenes de conocimiento)
-**Término:** [Concepto principal]
-**Esencia:** [Definición de 1 línea, muy directa]
-**Detalle:** 
-- [Punto clave 1]
-- [Punto clave 2]
+[Título Opcional si aplica]
 
-MODO 2: process (Para guías, pasos a seguir, o flujos de ejecución)
-**Objetivo:** [Qué se busca lograr]
-**Secuencia de pasos:** 
-1. [Paso 1]
-2. [Paso 2]
-**Riesgos:** [Posibles fallas o puntos críticos]
-**Siguiente Acción:** [El paso inmediato a tomar]
+🌱 Lo esencial
+(Un párrafo corto y humano con la idea principal)
 
-MODO 3: stats (Para reportes, métricas, analíticas o datos duros)
-**Hallazgo:** [El dato o descubrimiento clave]
-**Métrica:** [Los números exactos relevantes]
-**Interpretación:** [Qué significa este dato en el contexto real]
-**Implicación:** [Qué decisiones debemos tomar basados en esto]
+✨ Lo que vale la pena recordar
+(Un párrafo breve o pocos bullets amigables con el núcleo útil, sin abusar del formato)
 
-MODO 4: dreaming (Modo por defecto. Para ideas, reflexiones, journals o lluvias de ideas)
-**Idea Central:** [La idea o reflexión principal]
-**Expansión:** [Desarrollo profundo en 1 o 2 párrafos concisos]
-**Variantes / Alternativas:** [Otras formas de abordar la idea]
-**Posibles Aplicaciones:** [Lista de casos de uso]
-**Próximo Experimento:** [Una pequeña acción para validar o avanzar la idea]
+🛠️ Cómo aterrizarlo
+(Solo si el prompt implica un proceso o pasos)
+
+📊 Qué mirar o medir
+(Solo si el prompt implica datos, estadísticas o métricas reales)
+
+🚀 Próximo paso
+(Cierre corto, accionable y natural)
+
+Nota: Puedes variar los emojis (ej. 🧠, 🤝, 🔥) dependiendo del tema, pero mantén la estructura limpia y natural.
 """
         messages = [
             {"role": "system", "content": system_prompt.strip()},
-            {"role": "user", "content": f"Reescribe y formatea el siguiente texto:\n\n{raw_content}"}
+            {"role": "user", "content": f"Escribe esta nota para mi Notion con un estilo natural, limpio, profundo y agradable:\n\n{raw_content}"}
         ]
         
         logger.info("Applying Note Formatting Policy...")

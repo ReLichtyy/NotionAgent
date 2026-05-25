@@ -78,6 +78,8 @@ def main():
         print("\n" + "=" * 50)
         print(" SELECCIÓN DE AGENTE")
         print("=" * 50)
+        UIFormatter.print_stars_rags()
+        print()
         
         for idx, agent in enumerate(agents, 1):
             print(f"{idx}. {agent.get_name()} - {agent.get_description()}")

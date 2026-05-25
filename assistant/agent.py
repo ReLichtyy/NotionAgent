@@ -19,28 +19,41 @@ class NotionMentorAgent(BaseMentorAgent):
                 "type": "function",
                 "function": {
                     "name": "append_to_notion",
-                    "description": "Appends a new toggle block with generated insight/summary to a specific Notion page.",
+                    "description": "Formatea una idea estructurada y la guarda (crea o añade) en Notion usando el intent resolver dinámico.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "page_title_or_id": {
-                                "type": "string",
-                                "description": "The EXACT title of the Notion page you want to write to (from the MAPA DE CONOCIMIENTO), or its ID."
-                            },
-                            "insight_title": {
-                                "type": "string",
-                                "description": "The title of the toggle block (e.g. '🤖 Lab Sync Insight: Resumen de Marketing')"
-                            },
                             "insight_content": {
                                 "type": "string",
-                                "description": "The actual detailed text content to append inside the toggle block."
+                                "description": "El borrador de la nota, reflexión o información a guardar."
                             }
                         },
-                        "required": ["page_title_or_id", "insight_title", "insight_content"]
+                        "required": ["insight_content"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "analyze_local_project",
+                    "description": "Escanea una ruta local, lee archivos clave (package.json, README, etc.) y devuelve un reporte estructurado de arquitectura, riesgos y deuda técnica.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "La ruta absoluta o relativa del proyecto local a analizar."
+                            }
+                        },
+                        "required": ["path"]
                     }
                 }
             }
         ]
+        
+    def _get_live_context(self, target_id: str) -> str:
+        """Fetches live content from Notion API for grounded reading/writing."""
+        return self.notion_client.read_page_content_as_text(target_id)
         
     def _get_system_prompt(self) -> str:
         """Builds the base system prompt heavily grounded in RAG instructions."""
@@ -53,58 +66,34 @@ class NotionMentorAgent(BaseMentorAgent):
         
         available_notes_str = ", ".join(paths)
         
-        return f"""Eres Lab Sync, un Mentor Estratégico personal y altamente inteligente con permisos de ESCRITURA en Notion.
-Tu tono debe ser súper entusiasta, cálido, motivador y hablarme como mi mentor-amigo de confianza. 🚀
-¡Usa emojis en tus respuestas para darle mucha más vida y energía a nuestra conversación! ✨
-Tu objetivo es ayudarme a aterrizar mis ideas de forma clara y útil.
+        return f"""Eres Lab Sync, un Mentor Estratégico personal y altamente eficiente con permisos de ESCRITURA en Notion.
+Tu tono debe ser directo, maduro, útil y sin exageraciones dramáticas (no uses frases como "¡Vamos a triunfar!" o "¡No me rindo!").
+Habla como un asesor experto de confianza. Responde con naturalidad si algo falla y ofrece alternativas.
 
 === TU MAPA DE CONOCIMIENTO (ÍNDICE) ===
 Tienes acceso a leer y ESCRIBIR sobre las siguientes notas de Notion:
 [{available_notes_str}]
 
 REGLAS CRÍTICAS DE GROUNDING Y RECUPERACIÓN (RAG):
-1. En cada mensaje, se te inyectará un bloque "[CONTEXTO RECUPERADO]". Tu base de conocimiento para responder es EXCLUSIVAMENTE ese texto.
-2. Si el usuario pide que añadas, guardes, resumas o escribas algo en Notion, DEBES usar la herramienta `append_to_notion` usando el título exacto de la nota del MAPA DE CONOCIMIENTO.
-3. Si la nota que el usuario menciona no está en el MAPA DE CONOCIMIENTO, dile que no la encuentras.
+1. En cada mensaje se inyectará un bloque "[CONTEXTO RECUPERADO]". Úsalo para responder.
+2. Si el usuario pide que guardes, añadas o escribas algo en Notion, DEBES usar la herramienta `append_to_notion` sin intentar adivinar los IDs precisos (escribe el nombre que el usuario te pidió, el sistema lo resolverá internamente).
+3. No le expliques al usuario los JSONs internos ni las herramientas, mantén la respuesta limpia.
 """
 
     def handle_tool_call(self, tool_call) -> str:
-        """Handles Notion specific tool calls."""
-        if tool_call.function.name == "append_to_notion":
-            args = json.loads(tool_call.function.arguments)
-            page_title_or_id = args.get("page_title_or_id")
-            insight_title = args.get("insight_title")
-            insight_content = args.get("insight_content")
-            
-            # Resolver Page ID
-            page_id = None
-            for frag in self.search_index.fragments:
-                if frag.get("title") == page_title_or_id or frag.get("id") == page_title_or_id:
-                    page_id = frag.get("id")
-                    break
-                    
-            if not page_id:
-                return f"Error: No encontré la página '{page_title_or_id}'."
-            else:
-                from core.spinner import RainbowSpinner
-                
-                with RainbowSpinner("Estructurando nota..."):
-                    from generator.note_policy import NoteFormattingPolicy
-                    formatter = NoteFormattingPolicy(self.openai_client)
-                    structured_content = formatter.process(insight_content)
-                
-                print(f"{CYAN}[TOOL] Escribiendo '{insight_title}' en Notion...{RESET}")
-                success, error_msg = self.notion_client.append_toggle_to_page(page_id, insight_title, structured_content)
-                if success:
-                    return f"Éxito: Se añadió correctamente el contenido a la página '{page_title_or_id}' con formato estructurado."
-                else:
-                    fallback_prompt = (
-                        f"Error: {error_msg}. \n"
-                        f"[INSTRUCCIÓN CRÍTICA PARA EL AGENTE LLM] "
-                        f"Dile al usuario que no pudiste escribir en Notion por problemas de permisos y entrégale "
-                        f"el siguiente contenido en un bloque de código Markdown para que pueda copiarlo y pegarlo manualmente:\n\n"
-                        f"# {insight_title}\n{insight_content}"
-                    )
-                    return fallback_prompt
-                    
-        return super().handle_tool_call(tool_call)
+        """Handles internal tool calls by delegating to the WritingOrchestrator."""
+        from core.writing_orchestrator import WritingOrchestrator
+        orchestrator = WritingOrchestrator(self.openai_client, self.notion_client)
+        
+        if tool_call.function.name == "analyze_local_project":
+            return orchestrator.execute_analyze_local(tool_call)
+
+        elif tool_call.function.name == "append_to_notion":
+            return orchestrator.execute_append_to_notion(
+                tool_call, 
+                self.conversation_history, 
+                self.search_index.fragments,
+                self._get_live_context
+            )
+        
+        return "Herramienta no implementada."
