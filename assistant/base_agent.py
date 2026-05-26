@@ -195,7 +195,14 @@ class BaseMentorAgent(ABC):
                 metrics.end_phase("Semantic Search")
                 
                 # 2. Construir Prompt
-                dynamic_user_prompt = f"[CONTEXTO DEL WORKSPACE ({st.source.upper()})]\n{context_str}\n\n[CONSULTA DEL USUARIO]\n{user_input}"
+                ux_rules = ""
+                if st.action_type == ActionType.CLARIFY and st.suggested_candidates:
+                    cands = "\n".join([f"- {c}" for c in st.suggested_candidates])
+                    ux_rules = f"\n\n[REGLAS UX CLARIFY]\nEl usuario intentó navegar pero no hubo coincidencia exacta.\nDEBES decirle directamente: 'No encontré una coincidencia exacta. ¿Te referías a alguna de estas opciones?' y listar ESTOS candidatos:\n{cands}\nNO asumas, NO inventes. Solo lista las opciones y pide confirmación."
+                elif st.action_type == ActionType.NAVIGATE:
+                    ux_rules = "\n\n[REGLAS UX NAVIGATE]\nConfirma brevemente que llegaste a la página solicitada. NO resumas todo el contenido del workspace a menos que sea necesario."
+                
+                dynamic_user_prompt = f"[CONTEXTO DEL WORKSPACE ({st.source.upper()})]\n{context_str}{ux_rules}\n\n[CONSULTA DEL USUARIO]\n{user_input}"
                 self.conversation_history.append({"role": "user", "content": dynamic_user_prompt})
                 
                 metrics.start_phase("LLM Generation")

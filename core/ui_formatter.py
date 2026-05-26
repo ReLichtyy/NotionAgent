@@ -117,7 +117,7 @@ class FocusPresenter:
             ActionType.LIST_CHILDREN: "Navigation",
             ActionType.SEARCH_CONTENT: "Semantic Search",
             ActionType.WRITE_NOTE: "Mutation",
-            ActionType.CLARIFY: "Chat",
+            ActionType.CLARIFY: "Clarify",
             ActionType.IDLE: "Chat"
         }
         mode_text = mode_mapping.get(state.action_type, "Chat")

@@ -1,5 +1,6 @@
 import json
 import difflib
+import re
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
@@ -59,48 +60,128 @@ class ActionState(BaseModel):
     confidence: float = 1.0
     last_query: Optional[str] = None
     target_node_name: Optional[str] = None 
+    suggested_candidates: List[str] = Field(default_factory=list)
+
+
+class CandidateRanker:
+    def __init__(self, current_focus_id: str = None):
+        self.current_focus_id = current_focus_id
+
+    def tokenize(self, text: str) -> set:
+        if not text: return set()
+        clean = re.sub(r'[^a-z0-9\s]', '', text.lower())
+        stopwords = {"el", "la", "los", "las", "un", "una", "de", "en", "y", "a", "mi", "mis"}
+        return {w for w in clean.split() if w not in stopwords and len(w) > 1}
+
+    def score_candidate(self, query: str, node, nav_index, temp_semantic_score: float = 0.0) -> float:
+        query_tokens = self.tokenize(query)
+        node_tokens = self.tokenize(node.title)
+        
+        # 1. Exact Match (40%)
+        exact_score = 1.0 if query.strip().lower() == node.title.strip().lower() else 0.0
+        
+        # 2. Token Coverage (30%)
+        if not query_tokens:
+            coverage_score = 0.0
+        else:
+            intersection = query_tokens.intersection(node_tokens)
+            coverage_score = len(intersection) / len(query_tokens)
+            
+        # 3. Path / Breadcrumb Match (10%)
+        path_tokens = self.tokenize(node.breadcrumb)
+        path_intersection = query_tokens.intersection(path_tokens)
+        path_score = len(path_intersection) / len(query_tokens) if query_tokens else 0.0
+        
+        # 4. Focus Proximity (10%)
+        proximity_score = 0.0
+        if self.current_focus_id:
+            if node.parent_id == self.current_focus_id:
+                proximity_score = 1.0
+            else:
+                curr_node = nav_index.get_node(self.current_focus_id)
+                if curr_node and node.parent_id == curr_node.parent_id:
+                    proximity_score = 0.5
+                    
+        # 5. Semantic Score (10%)
+        semantic_score = temp_semantic_score
+
+        final = (0.4 * exact_score) + (0.3 * coverage_score) + (0.1 * path_score) + (0.1 * semantic_score) + (0.1 * proximity_score)
+        
+        if coverage_score == 1.0 and exact_score == 0:
+            final = max(final, 0.86)
+
+        return min(final, 1.0)
 
 
 class ActionStateRouter:
     def __init__(self, openai_client: OpenAIAppClient):
         self.openai_client = openai_client
 
-    def resolve_navigation_target(self, target_query: str, nav_index, search_index) -> Optional[PageFocusState]:
-        """Algoritmo de 3 niveles para encontrar el Page Focus."""
+    def resolve_navigation_target(self, target_query: str, nav_index, search_index, current_focus_id: str) -> tuple[Optional[PageFocusState], List[str]]:
+        """Multi-layer resolver returning FocusState and candidates."""
+        ranker = CandidateRanker(current_focus_id=current_focus_id)
         
-        # 1. Exact/Fuzzy Title Match
-        title_matches = nav_index.find_by_title(target_query)
-        if title_matches:
-            node = title_matches[0]
-            node_state = NodeState.ACTIVE if node.accessible else NodeState.INACCESSIBLE
-            return PageFocusState(is_focused=True, current_node_id=node.id, current_node_name=node.title, parent_node_id=node.parent_id, path=node.path, node_state=node_state, breadcrumb=node.breadcrumb)
+        candidates = []
+        
+        # Broad Retrieval
+        query_tokens = ranker.tokenize(target_query)
+        if not query_tokens:
+            return None, []
             
-        # 2. Path Match
-        path_match = nav_index.resolve_path(target_query)
-        if path_match:
-            node_state = NodeState.ACTIVE if path_match.accessible else NodeState.INACCESSIBLE
-            return PageFocusState(is_focused=True, current_node_id=path_match.id, current_node_name=path_match.title, parent_node_id=path_match.parent_id, path=path_match.path, node_state=node_state, breadcrumb=path_match.breadcrumb)
+        for node in nav_index.tree.values():
+            node_tokens = ranker.tokenize(node.title)
+            path_tokens = ranker.tokenize(node.breadcrumb)
             
-        # 3. Semantic Search Fallback
-        semantic_matches = search_index.search(target_query, top_k=1)
-        if semantic_matches:
-            frag = semantic_matches[0]
-            # Extraer info completa usando el nav_index si existe
-            # SimpleSearchIndex usa path. Nav index usa id, asi que usamos search por id
+            if query_tokens.intersection(node_tokens) or query_tokens.intersection(path_tokens) or target_query.lower() in node.breadcrumb.lower():
+                candidates.append(node)
+                
+        # Semantic Fallback (get top 3 and try to add them if not already there)
+        semantic_matches = search_index.search(target_query, top_k=3)
+        for frag in semantic_matches:
             node_id = frag.get("id")
             if node_id:
                 node = nav_index.get_node(node_id)
-                if node:
-                    node_state = NodeState.ACTIVE if node.accessible else NodeState.INACCESSIBLE
-                    return PageFocusState(is_focused=True, current_node_id=node.id, current_node_name=node.title, parent_node_id=node.parent_id, path=node.path, node_state=node_state, breadcrumb=node.breadcrumb)
-                
-            # Fallback si no esta en nav_index pero si en search
-            return PageFocusState(is_focused=True, current_node_id=node_id, current_node_name=frag.get("title"), path=frag.get("path"), breadcrumb=[frag.get("title")])
-                
-        return None
+                if node and node not in candidates:
+                    candidates.append(node)
+                    
+        # Scoring
+        scored = []
+        for node in candidates:
+            # Check if this node was a semantic match to give it a semantic score boost
+            semantic_score = 0.0
+            for i, frag in enumerate(semantic_matches):
+                if frag.get("id") == node.id:
+                    semantic_score = max(0, 1.0 - (i * 0.2)) # 1.0, 0.8, 0.6
+                    break
+                    
+            score = ranker.score_candidate(target_query, node, nav_index, semantic_score)
+            scored.append((score, node))
+            
+        scored.sort(key=lambda x: x[0], reverse=True)
+        
+        if not scored:
+            return None, []
+            
+        best_score, best_node = scored[0]
+        
+        # Threshold Check
+        if best_score > 0.85:
+            node_state = NodeState.ACTIVE if best_node.accessible else NodeState.INACCESSIBLE
+            return PageFocusState(
+                is_focused=True, 
+                current_node_id=best_node.id, 
+                current_node_name=best_node.title, 
+                parent_node_id=best_node.parent_id, 
+                path=best_node.path, 
+                node_state=node_state, 
+                breadcrumb=best_node.breadcrumb
+            ), []
+            
+        # CLARIFY condition
+        top_candidates = [f"{n.breadcrumb} (Score: {s:.2f})" for s, n in scored[:3] if s > 0.1]
+        return None, top_candidates
 
     def route(self, last_state: ActionState, user_message: str, nav_index, search_index) -> ActionState:
-        # Extraemos títulos conocidos limitados
         known_notion = [n.title for n in list(nav_index.tree.values())][:10]
         
         prompt = f"""
@@ -160,12 +241,11 @@ Campos posibles en tu JSON de respuesta:
     def update_action_state(self, last_state: ActionState, user_message: str, llm_decision: dict, nav_index, search_index) -> ActionState:
         new_state = last_state.model_copy(deep=True)
         new_state.last_query = user_message
+        new_state.suggested_candidates = [] # reset on each turn
         
-        # 1. Heurísticas explícitas (Sube un nivel)
         up_keywords = ["sube un nivel", "ir atras", "volver arriba", "nivel superior"]
         if any(k in user_message.lower() for k in up_keywords):
             if new_state.focus.parent_node_id:
-                # Encontrar el nodo padre en el nav_index
                 parent_node = nav_index.get_node(new_state.focus.parent_node_id)
                 if parent_node:
                     node_state = NodeState.ACTIVE if parent_node.accessible else NodeState.INACCESSIBLE
@@ -173,18 +253,15 @@ Campos posibles en tu JSON de respuesta:
                     new_state.action_type = ActionType.NAVIGATE
                     return new_state
             else:
-                # Ya estamos en la raíz o foco global
                 new_state.focus = PageFocusState(is_focused=False)
                 new_state.action_type = ActionType.NAVIGATE
                 return new_state
 
-        # 2. Heurísticas ("En qué page estás")
         status_keywords = ["en que page", "donde estamos", "ubicacion actual"]
         if any(k in user_message.lower() for k in status_keywords):
             new_state.action_type = ActionType.IDLE
             return new_state
 
-        # 3. Heurísticas (Limpieza de búsqueda)
         limpieza_keywords = ["elimina mi búsqueda", "borra la búsqueda", "limpia los filtros", "borrar búsqueda", "quita los filtros"]
         if any(k in user_message.lower() for k in limpieza_keywords):
             new_state.filters = SearchFilters() 
@@ -211,12 +288,13 @@ Campos posibles en tu JSON de respuesta:
             new_state.target_node_name = target_node
             
             if new_state.action_type in [ActionType.NAVIGATE, ActionType.READ_NODE, ActionType.READ_TREE, ActionType.LIST_CHILDREN]:
-                new_focus = self.resolve_navigation_target(target_node, nav_index, search_index)
+                new_focus, candidates = self.resolve_navigation_target(target_node, nav_index, search_index, new_state.focus.current_node_id)
                 if new_focus:
                     new_state.focus = new_focus
                 else:
                     new_state.action_type = ActionType.CLARIFY
                     new_state.focus.node_state = NodeState.MISSING
+                    new_state.suggested_candidates = candidates
                 
         return new_state
 
