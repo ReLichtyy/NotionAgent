@@ -55,7 +55,12 @@ class NotionExtractionPipeline:
             fragments = json_generator.generate(parsed_root_node)
             json_generator.export_to_file(fragments, self.settings.NOTION_JSON_PATH)
             
-            if os.path.exists(self.settings.NOTION_JSON_PATH):
+            logger.info("--- Phase 5: Building Structural Navigation Tree ---")
+            from core.navigation_index import NavigationIndex
+            nav_index = NavigationIndex()
+            nav_index.build_from_rawnodes(raw_root_node)
+            
+            if os.path.exists(self.settings.NOTION_JSON_PATH) and os.path.exists(nav_index.storage_path):
                 size = os.path.getsize(self.settings.NOTION_JSON_PATH)
                 logger.info(f"Extraction pipeline completed successfully. Generated JSON size: {size} bytes")
                 return True

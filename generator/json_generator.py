@@ -24,6 +24,13 @@ class JsonFragmentGenerator:
             
         combined_text = "\n".join(content_parts).strip()
         
+        # Inject status warnings if node is not active
+        from domain.contracts import NodeStatus
+        if getattr(node.metadata, 'status', NodeStatus.ACTIVE) == NodeStatus.INACCESSIBLE:
+            combined_text = "[Recurso Restringido: Asegúrate de compartir esta base de datos con la integración de Notion.]\n" + combined_text
+        elif getattr(node.metadata, 'status', NodeStatus.ACTIVE) == NodeStatus.MISSING:
+            combined_text = "[Recurso Fantasma: Este enlace apunta a una página o base de datos que ya no existe o fue eliminada.]\n" + combined_text
+        
         # Only save a fragment if it actually contains text to avoid empty chunk pollution
         if combined_text:
             fragment = {

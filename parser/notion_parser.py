@@ -34,7 +34,8 @@ class NotionParser:
             path=new_path,
             depth=depth,
             source_type=source_type,
-            title=title
+            title=title,
+            status=raw_node.status
         )
         
         text_blocks: List[BlockContext] = []

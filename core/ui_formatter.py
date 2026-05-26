@@ -6,6 +6,8 @@ from rich.text import Text
 from rich.panel import Panel
 from rich.align import Align
 
+from assistant.action_state import ActionState, Source, ActionType, NodeState
+
 console = Console()
 
 class UIFormatter:
@@ -81,3 +83,73 @@ class UIFormatter:
             # Ensure final render is complete
             live.update(Markdown(content))
         console.print()
+
+
+class FocusPresenter:
+    
+    @staticmethod
+    def render_focus_banner(state: ActionState):
+        """Renderiza el banner de UX en terminal usando rich."""
+        
+        # 1. Resolver Source
+        source_config = {
+            Source.NOTION: ("📘", "blue", "Notion"),
+            Source.LOCAL: ("📂", "green", "Local"),
+            Source.HYBRID: ("🧠", "magenta", "Hybrid")
+        }
+        src_emoji, src_color, src_name = source_config.get(state.source, ("❓", "white", "Unknown"))
+        
+        # 2. Resolver Status
+        if state.action_type == ActionType.CLARIFY:
+            status_emoji = "🟡"
+        elif state.focus.node_state in [NodeState.INACCESSIBLE, NodeState.MISSING, NodeState.STALE_ID]:
+            status_emoji = "🔴"
+        elif state.focus.is_focused:
+            status_emoji = "🟢"
+        else:
+            status_emoji = "🌐"
+            
+        # 3. Resolver Mode
+        mode_mapping = {
+            ActionType.NAVIGATE: "Navigation",
+            ActionType.READ_NODE: "Navigation",
+            ActionType.READ_TREE: "Navigation",
+            ActionType.LIST_CHILDREN: "Navigation",
+            ActionType.SEARCH_CONTENT: "Semantic Search",
+            ActionType.WRITE_NOTE: "Mutation",
+            ActionType.CLARIFY: "Chat",
+            ActionType.IDLE: "Chat"
+        }
+        mode_text = mode_mapping.get(state.action_type, "Chat")
+        
+        # 4. Resolver Focus (Breadcrumb)
+        if state.focus.is_focused and state.focus.path:
+            focus_str = state.focus.path
+        elif state.focus.is_focused and state.focus.current_node_name:
+            focus_str = state.focus.current_node_name
+        else:
+            focus_str = "Global Workspace"
+            
+        # 5. Resolver Filtro
+        filter_str = f'"{state.filters.topic}"' if state.filters.topic else "none"
+        filter_style = "bold yellow" if state.filters.topic else "dim white"
+
+        # 6. Ensamblar con Rich
+        banner = Text()
+        banner.append("[ ", style="bold white")
+        banner.append(f"{status_emoji} {src_emoji} ", style="default")
+        banner.append(f"{src_name}", style=f"bold {src_color}")
+        banner.append(" | ", style="dim white")
+        banner.append("Focus: ", style="bold white")
+        banner.append(f"{focus_str}", style="bold cyan")
+        banner.append(" | ", style="dim white")
+        banner.append("Mode: ", style="bold white")
+        banner.append(f"{mode_text}", style="bold magenta")
+        banner.append(" | ", style="dim white")
+        banner.append("Filter: ", style="bold white")
+        banner.append(f"{filter_str}", style=filter_style)
+        banner.append(" ]", style="bold white")
+
+        console.print()
+        console.print(banner)
+        console.print() 

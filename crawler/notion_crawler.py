@@ -23,7 +23,15 @@ class NotionCrawler:
             return "Untitled"
         except Exception:
             return "Untitled"
-
+    def _extract_icon(self, page_obj: Dict[str, Any]) -> Optional[str]:
+        """Helper to extract an emoji icon from a page object if available."""
+        try:
+            icon_obj = page_obj.get("icon")
+            if icon_obj and icon_obj.get("type") == "emoji":
+                return icon_obj.get("emoji")
+        except Exception:
+            pass
+        return None
     def crawl_page(self, page_id: str, current_depth: int = 0) -> Optional[RawNode]:
         """Crawls a single page and its children recursively up to max_depth."""
         if current_depth > self.max_depth:
@@ -32,17 +40,20 @@ class NotionCrawler:
 
         logger.info(f"Crawling page: {page_id} (Depth: {current_depth})")
         
-        # Get page details for title
+        # Get page details for title and icon
         page_obj = self.client.get_page_details(page_id)
         title = self._extract_title(page_obj)
+        icon = self._extract_icon(page_obj)
 
         # Get all blocks
-        blocks = self.client.get_page_blocks(page_id)
+        blocks, status = self.client.get_page_blocks(page_id)
         
         node = RawNode(
             node_id=page_id,
             node_type="page",
             title=title,
+            icon=icon,
+            status=status,
             raw_blocks=blocks,
             children=[]
         )
@@ -73,15 +84,17 @@ class NotionCrawler:
 
         logger.info(f"Crawling database: {database_id} (Depth: {current_depth})")
         
+        pages, status = self.client.get_database_pages(database_id)
+        
         node = RawNode(
             node_id=database_id,
             node_type="database",
             title=f"Database {database_id}",
+            status=status,
             raw_blocks=[],
             children=[]
         )
 
-        pages = self.client.get_database_pages(database_id)
         for page in pages:
             page_id = page.get("id")
             # Pages inside DB are children of the DB

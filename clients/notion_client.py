@@ -50,13 +50,16 @@ class NotionAppClient:
             logger.error(f"Failed to search workspace: {e}")
             return []
 
-    def get_page_blocks(self, block_id: str) -> List[Dict[str, Any]]:
+    def get_page_blocks(self, block_id: str) -> tuple[List[Dict[str, Any]], str]:
         """
         Retrieves all children blocks for a given block/page ID, handling pagination.
+        Returns a tuple of (blocks, status).
         """
+        from domain.contracts import NodeStatus
         blocks = []
         has_more = True
         next_cursor = None
+        status = NodeStatus.ACTIVE
         
         while has_more:
             try:
@@ -70,19 +73,34 @@ class NotionAppClient:
                 
                 has_more = response.get("has_more", False)
                 next_cursor = response.get("next_cursor")
+            except APIResponseError as e:
+                if e.code == "object_not_found":
+                    logger.warning(f"Block/Page {block_id} missing or inaccessible (object_not_found).")
+                    status = NodeStatus.MISSING
+                elif e.code == "restricted_resource":
+                    logger.warning(f"Block/Page {block_id} restricted (restricted_resource).")
+                    status = NodeStatus.INACCESSIBLE
+                else:
+                    logger.error(f"API Error fetching blocks for {block_id}: {e}")
+                    status = NodeStatus.INACCESSIBLE
+                break
             except Exception as e:
                 logger.error(f"Failed to get blocks for {block_id}: {e}")
+                status = NodeStatus.INACCESSIBLE
                 break
                 
-        return blocks
+        return blocks, status
 
-    def get_database_pages(self, database_id: str) -> List[Dict[str, Any]]:
+    def get_database_pages(self, database_id: str) -> tuple[List[Dict[str, Any]], str]:
         """
         Queries a database to get all pages inside it, handling pagination.
+        Returns a tuple of (pages, status).
         """
+        from domain.contracts import NodeStatus
         pages = []
         has_more = True
         next_cursor = None
+        status = NodeStatus.ACTIVE
         
         while has_more:
             try:
@@ -107,11 +125,23 @@ class NotionAppClient:
                 
                 has_more = response.get("has_more", False)
                 next_cursor = response.get("next_cursor")
+            except APIResponseError as e:
+                if e.code == "object_not_found":
+                    logger.warning(f"Database {database_id} missing or inaccessible (object_not_found).")
+                    status = NodeStatus.MISSING
+                elif e.code == "restricted_resource":
+                    logger.warning(f"Database {database_id} restricted (restricted_resource).")
+                    status = NodeStatus.INACCESSIBLE
+                else:
+                    logger.error(f"API Error fetching database {database_id}: {e}")
+                    status = NodeStatus.INACCESSIBLE
+                break
             except Exception as e:
                 logger.error(f"Failed to query database {database_id}: {e}")
+                status = NodeStatus.INACCESSIBLE
                 break
                 
-        return pages
+        return pages, status
 
     def get_page_details(self, page_id: str) -> Dict[str, Any]:
         """
@@ -131,7 +161,7 @@ class NotionAppClient:
         """
         try:
             # Fix 4.1: Safe Append / Overlap Validation
-            existing_blocks = self.get_page_blocks(page_id)
+            existing_blocks, _ = self.get_page_blocks(page_id)
             for block in existing_blocks:
                 b_type = block.get("type")
                 if b_type == "toggle":
@@ -226,7 +256,7 @@ class NotionAppClient:
         This is useful for injecting the LIVE existing content of a page into the LLM context.
         """
         try:
-            blocks = self.get_page_blocks(page_id)
+            blocks, _ = self.get_page_blocks(page_id)
             if not blocks:
                 return ""
             
