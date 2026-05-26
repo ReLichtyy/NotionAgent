@@ -89,16 +89,7 @@ class ActionStateRouter:
             # SimpleSearchIndex usa path. Nav index usa id, asi que usamos search por id
             node_id = frag.get("id")
             if node_id:
-                # In navigation_index, we can traverse or just search.
-                # Para simplificar si no hay get_node directo:
-                def find_node_by_id(nodes, tid):
-                    for n in nodes:
-                        if n.id == tid: return n
-                        res = find_node_by_id(n.children, tid)
-                        if res: return res
-                    return None
-                    
-                node = find_node_by_id(nav_index.root_nodes, node_id)
+                node = nav_index.get_node(node_id)
                 if node:
                     node_state = NodeState.ACTIVE if node.accessible else NodeState.INACCESSIBLE
                     return PageFocusState(is_focused=True, current_node_id=node.id, current_node_name=node.title, parent_node_id=node.parent_id, path=node.path, node_state=node_state, breadcrumb=node.breadcrumb)
@@ -110,7 +101,7 @@ class ActionStateRouter:
 
     def route(self, last_state: ActionState, user_message: str, nav_index, search_index) -> ActionState:
         # Extraemos títulos conocidos limitados
-        known_notion = [n.title for n in nav_index.root_nodes][:10]
+        known_notion = [n.title for n in list(nav_index.tree.values())][:10]
         
         prompt = f"""
 Eres el 'Action Router' del sistema.
@@ -175,14 +166,7 @@ Campos posibles en tu JSON de respuesta:
         if any(k in user_message.lower() for k in up_keywords):
             if new_state.focus.parent_node_id:
                 # Encontrar el nodo padre en el nav_index
-                def find_node(nodes, target_id):
-                    for n in nodes:
-                        if n.id == target_id: return n
-                        res = find_node(n.children, target_id)
-                        if res: return res
-                    return None
-                    
-                parent_node = find_node(nav_index.root_nodes, new_state.focus.parent_node_id)
+                parent_node = nav_index.get_node(new_state.focus.parent_node_id)
                 if parent_node:
                     node_state = NodeState.ACTIVE if parent_node.accessible else NodeState.INACCESSIBLE
                     new_state.focus = PageFocusState(is_focused=True, current_node_id=parent_node.id, current_node_name=parent_node.title, parent_node_id=parent_node.parent_id, path=parent_node.path, node_state=node_state, breadcrumb=parent_node.breadcrumb)

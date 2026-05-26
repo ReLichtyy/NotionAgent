@@ -128,3 +128,7 @@ class NavigationIndex:
                 descendants.append(self.tree[cid])
                 descendants.extend(self.get_descendants(cid))
         return descendants
+
+    def get_node(self, node_id: str) -> Optional[NavNode]:
+        """Fetches a node by ID from the tree."""
+        return self.tree.get(node_id)
